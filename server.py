@@ -110,7 +110,7 @@ class Index(object):
             if not query_dict:
                 if merge_user:
                     #already exists, update doc
-                    user_collection.update(query_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
+                    user_collection.update(merge_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
                 else:
                     #no merge_user, should insert
                     user_collection.insert({name:{"token":token,"user_id":user_id}},safe=True)
@@ -129,9 +129,13 @@ class Index(object):
                         user_collection.remove(query_user)
                         user_collection.save(new_user)
                 else:
-                    #no merge_user, should insert
-                    user_collection.insert({name:{"token":token,"user_id":user_id}},safe=True)
-
+                    #query user, but no merge user
+                    if not (name in query_user):
+                        user_collection.update(query_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
+                    else:
+                        #already has a hunch id
+                        #are you sure you want to replace your old <name> acct?
+                        pass
 
         except pymongo.errors.OperationFailure:
             return "Did not insert or update correctly."
