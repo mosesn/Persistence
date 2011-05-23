@@ -30,64 +30,27 @@ class Index(object):
         authDict["code"] = code
         urlencoding = urllib.urlencode(authDict)
         req = urllib2.urlopen("https://foursquare.com/oauth2/access_token",urlencoding)
-
         dicty = json.load(req)
         token = dicty["access_token"]
-        
-        
         get_user_dict = {"oauth_token":token}
         urlencoding = urllib.urlencode(get_user_dict)
-        
         req = urllib2.urlopen("https://api.foursquare.com/v2/users/self?"+urlencoding)
-
         dicty = json.load(req)
         user_id = dicty["response"]["user"]["id"]
-        try:
-            query_dict = self.query_gen()
-            if not query_dict:
-                self.login("foursq.user_id",user_id)
-                query_dict["foursq.user_id"]=user_id
-            user_collection = db.Users
-            if user_collection.find_one(query_dict):
-                user_collection.update(query_dict,{"$set":{"foursq":{"token":token,"user_id":user_id}}},upsert=True,safe=True)
-            else:
-                user_collection.insert({"foursq":{"token":token,"user_id":user_id}},safe=True)
-        except pymongo.errors.OperationFailure:
-            return "Did not insert or update correctly."
-        except:
-            return "Did not insert or update correctly."
+        return gen_insert("foursq",token,user_id)
 
-        return "Inserted or updated Correctly!"
-
-        return req
     foursq.exposed = True
 
     def hunch(self,auth_token_key="",user_id="",next=""):
         stri = "http://api.hunch.com/api/v1/get-auth-token/?app_id=3145924&auth_sig=" + self.sign_request({"auth_token_key":auth_token_key,"app_id":3145924}) + "&auth_token_key=" + auth_token_key
-#        req = json.loads(urllib2.urlopen(stri))
-#        return str(json.dumps(req))
         req = urllib2.urlopen(stri)
         dicty = json.loads(req.read())
-
         req.close()
         user_collection = db.Users
-        try:
-            query_dict = self.query_gen()
-            if not query_dict:
-                self.login("hunch.user_id",user_id)
-                query_dict["hunch.user_id"]=user_id
+        return gen_insert("hunch",dicty['auth_token'],user_id)
 
-            if user_collection.find_one(query_dict):
-                user_collection.update(query_dict,{"$set":{"hunch":{"token":dicty["auth_token"],"user_id":user_id}}},upsert=True,safe=True)
-            else:
-                user_collection.insert({"hunch":{"token":dicty["auth_token"],"user_id":user_id}},safe=True)
-        except pymongo.errors.OperationFailure:
-            return "Did not insert or update correctly."
-        except:
-            return "Did not insert or update correctly."
-
-        return "Inserted or updated Correctly!"
     hunch.exposed = True
+
 
     def user(self):
         query_dict = self.query_gen()
@@ -130,6 +93,52 @@ class Index(object):
                           for k,v in query_dict.iteritems() )
         data = urllib.urlencode(queries) + "bea75fd900ff3957688c12875399521ba52c6a05"
         return hashlib.sha1(data).hexdigest()
+
+    def gen_insert(self,name,token,user_id):
+        try:
+            query_dict = self.query_gen()
+            user_collection = db.Users
+            merge_dict = {name + ".user_id":user_id}
+
+            merge_user = user_collection.find_one(merge_dict)
+
+            if merge_user:
+                user_collection.update(merge_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
+            else:
+                user_collection.insert({name:{"token":token,"user_id":user_id}},safe=True)
+
+            if not query_dict:
+                if merge_user:
+                    #already exists, update doc
+                    user_collection.update(query_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
+                else:
+                    #no merge_user, should insert
+                    user_collection.insert({name:{"token":token,"user_id":user_id}},safe=True)
+                self.login(name + ".user_id",user_id)
+            else:
+                query_user = user_collection.find_one(query_dict)
+                if merge_user and (merge_user is query_user):
+                    if merge_user is query_user:
+                        #already the same document
+                        #should update the document
+                        user_collection.update(query_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
+                    else:
+                        #different documents, must merge
+                        new_user = dict(query_user.items() + merge_user.items())
+                        user_collection.remove(merge_user)
+                        user_collection.remove(query_user)
+                        user_collection.save(new_user)
+                else:
+                    #no merge_user, should insert
+                    user_collection.insert({name:{"token":token,"user_id":user_id}},safe=True)
+
+
+        except pymongo.errors.OperationFailure:
+            return "Did not insert or update correctly."
+        except:
+            return "Did not insert or update correctly."
+
+        return "Inserted or updated Correctly!"
 
 
 
