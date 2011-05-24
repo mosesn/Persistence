@@ -37,7 +37,7 @@ class Index(object):
         req = urllib2.urlopen("https://api.foursquare.com/v2/users/self?"+urlencoding)
         dicty = json.load(req)
         user_id = dicty["response"]["user"]["id"]
-        return gen_insert("foursq",token,user_id)
+        return self.gen_insert("foursq",token,user_id)
 
     foursq.exposed = True
 
@@ -47,7 +47,7 @@ class Index(object):
         dicty = json.loads(req.read())
         req.close()
         user_collection = db.Users
-        return gen_insert("hunch",dicty['auth_token'],user_id)
+        return self.gen_insert("hunch",dicty['auth_token'],user_id)
 
     hunch.exposed = True
 
@@ -85,8 +85,10 @@ class Index(object):
         resp_cookie = cherrypy.response.cookie
 
         for name in req_cookie.keys():
+            resp_cookie[name] = name
             resp_cookie[name]['expires'] = 0
         return "Logged out."
+    logout.exposed = True
 
     def sign_request(self,query_dict):
         queries = sorted( (unicode(k).encode('utf-8'), unicode(v).encode('utf-8'))
@@ -102,45 +104,54 @@ class Index(object):
 
             merge_user = user_collection.find_one(merge_dict)
 
-            if merge_user:
-                user_collection.update(merge_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
-            else:
-                user_collection.insert({name:{"token":token,"user_id":user_id}},safe=True)
-
             if not query_dict:
                 if merge_user:
                     #already exists, update doc
-                    user_collection.update(merge_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
+                    pos = merge_user[name]["user_id"].index(user_id)
+                    merge_user[name]["token"][pos] = token
+                    user_collection.save(merge_user)
                 else:
                     #no merge_user, should insert
-                    user_collection.insert({name:{"token":token,"user_id":user_id}},safe=True)
+                    user_collection.insert({name:{"token":[token],"user_id":[user_id]}},safe=True)
                 self.login(name + ".user_id",user_id)
             else:
+        
+
                 query_user = user_collection.find_one(query_dict)
-                if merge_user and (merge_user is query_user):
-                    if merge_user is query_user:
+                if merge_user:
+
+                    if merge_user == query_user:
                         #already the same document
                         #should update the document
-                        user_collection.update(query_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
+                        pos = merge_user[name]["user_id"].index(user_id)
+                        merge_user[name]["token"][pos] = token
+                        user_collection.save(merge_user)
+
                     else:
                         #different documents, must merge
-                        new_user = dict(query_user.items() + merge_user.items())
+                        new_user = query_user
+                        for key in merge_user.keys():
+                            if not (key == "_id"):
+                                if (key in new_user):
+                                    new_user[key]["token"].extend(merge_user[key]["token"])
+                                    new_user[key]["user_id"].extend(merge_user[key]["user_id"])
+                                else:
+                                    new_user[key] = {"token" : merge_user[key]["token"], "user_id" :  merge_user[key]["user_id"]}
+
                         user_collection.remove(merge_user)
                         user_collection.remove(query_user)
                         user_collection.save(new_user)
                 else:
+
                     #query user, but no merge user
-                    if not (name in query_user):
-                        user_collection.update(query_dict,{"$set":{name:{"token":token,"user_id":user_id}}},upsert=True,safe=True)
-                    else:
-                        #already has a hunch id
-                        #are you sure you want to replace your old <name> acct?
-                        pass
+                    user_collection.update(query_dict,{"$push":{name + ".token":token,name + ".user_id":user_id}},upsert=True,safe=True)
+
+
 
         except pymongo.errors.OperationFailure:
-            return "Did not insert or update correctly."
+            return "Did not insert or update correctly mongo."
         except:
-            return "Did not insert or update correctly."
+            return "Did not insert or update correctly error."
 
         return "Inserted or updated Correctly!"
 
