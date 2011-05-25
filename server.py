@@ -3,6 +3,7 @@ import cherrypy
 import urllib2
 import pymongo
 import json
+import urlparse
 
 import hashlib, urllib
 
@@ -14,10 +15,15 @@ class Index(object):
         facebook_str = "https://www.facebook.com/dialog/oauth?client_id=205743116130375&redirect_uri=127.0.0.1:8080/facebook/"
         hunch_str = "http://hunch.com/authorize/v1/?app_id=3145924"
         foursq_str = "http://foursquare.com/oauth2/authenticate?client_id=SSBHFHA21BL5IWNK1SIKUMNXH05GJOUYV2R3JTQEOVEV5OQW&response_type=code&redirect_uri=http://127.0.0.1:8080/foursq/"
-        return "<a href=" + facebook_str + ">Facebook</a><br />" + "<a href=" + hunch_str + ">Hunch</a><br /><a href="+ foursq_str + ">foursquare</a>"
+#        linkedin_str = "https://api.linkedin.com/uas/oauth/authorize?oauth_token=_OxVTx4U9I9xje7uxkbY5Uw0HsH5hKpdBPlVxoFOehcKkkoHSKa0koCxxxB9KgT1"
+        github_str = "https://github.com/login/oauth/authorize?client_id=ce9ca855b70e52445612&redirect_uri=http://127.0.0.1:8080/github/"
+        return "<a href=" + facebook_str + ">Facebook</a><br />" + "<a href=" + hunch_str + ">Hunch</a><br /><a href="+ foursq_str + ">foursquare</a><br /><a href=" + github_str + ">github</a>"
+
+#<br /><a href=" + linkedin_str + ">LinkedIn</a>"
     index.exposed = True
 
     def facebook(self,code=""):
+        #can't do this one yet
         return code
     facebook.exposed = True
 
@@ -41,16 +47,48 @@ class Index(object):
 
     foursq.exposed = True
 
+    def github(self, code=""):
+        client_id = "ce9ca855b70e52445612"
+        secret = "818d77432ff411cca94c4e4717080716aedfa39b"
+        stri = "https://github.com/login/oauth/access_token?client_id=ce9ca855b70e52445612&redirect_uri=http://127.0.0.1:8080/github/&client_secret=818d77432ff411cca94c4e4717080716aedfa39b&code="+code
+        req = urllib2.urlopen(stri)
+        cur = req.read()
+        req.close()
+        dicty = urlparse.parse_qs(cur)
+        print_str = ""
+        for key in dicty.keys():
+            #token_type & access_token
+            print_str += key + dicty[key][0]
+
+        token = dicty["access_token"][0]
+            
+        req = urllib2.urlopen("https://api.github.com/user?access_token=91072e84de7397dedf7b596dea0205229c3dd7c5")
+        cur = req.read()
+        req.close()
+        
+        return self.gen_insert("github",token,str(json.loads(cur)['id']))
+
+
+    github.exposed = True
+
     def hunch(self,auth_token_key="",user_id="",next=""):
         stri = "http://api.hunch.com/api/v1/get-auth-token/?app_id=3145924&auth_sig=" + self.sign_request({"auth_token_key":auth_token_key,"app_id":3145924}) + "&auth_token_key=" + auth_token_key
         req = urllib2.urlopen(stri)
         dicty = json.loads(req.read())
         req.close()
-        user_collection = db.Users
         return self.gen_insert("hunch",dicty['auth_token'],user_id)
 
     hunch.exposed = True
 
+    def linkedin(self):
+        #very confusing
+        return "linkedin"
+    linkedin.exposed = True
+
+    def twitter(self):
+        #can't do this one yet
+        return "twitter"
+    twitter.exposed = True
 
     def user(self):
         query_dict = self.query_gen()
@@ -155,6 +193,8 @@ class Index(object):
 
         return "Inserted or updated Correctly!"
 
-
+    def test1(self):
+        return "testing"
+    test1.exposed = True
 
 cherrypy.quickstart(Index())
