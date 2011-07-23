@@ -17,7 +17,8 @@ class Index(object):
         foursq_str = "http://foursquare.com/oauth2/authenticate?client_id=SSBHFHA21BL5IWNK1SIKUMNXH05GJOUYV2R3JTQEOVEV5OQW&response_type=code&redirect_uri=http://127.0.0.1:8080/foursq/"
 #        linkedin_str = "https://api.linkedin.com/uas/oauth/authorize?oauth_token=_OxVTx4U9I9xje7uxkbY5Uw0HsH5hKpdBPlVxoFOehcKkkoHSKa0koCxxxB9KgT1"
         github_str = "https://github.com/login/oauth/authorize?client_id=ce9ca855b70e52445612&redirect_uri=http://127.0.0.1:8080/github/"
-        return "<a href=" + facebook_str + ">Facebook</a><br />" + "<a href=" + hunch_str + ">Hunch</a><br /><a href="+ foursq_str + ">foursquare</a><br /><a href=" + github_str + ">github</a>"
+        tumblr_str = "http://www.tumblr.com/oauth/authorize?client_id=ssOHvZUGu5Fd0ZxjRS9v0HAY8NYwpn1elYt1otDA7y8Q2drIn0&redirect_uri=http://127.0.0.1:8080/tumblr/"
+        return "<a href=" + facebook_str + ">Facebook</a><br />" + "<a href=" + hunch_str + ">Hunch</a><br /><a href="+ foursq_str + ">foursquare</a><br /><a href=" + github_str + ">github</a><br /><a href=" + tumblr_str + ">tumblr</a>"
 
 #<br /><a href=" + linkedin_str + ">LinkedIn</a>"
     index.exposed = True
@@ -84,6 +85,10 @@ class Index(object):
         #very confusing
         return "linkedin"
     linkedin.exposed = True
+
+    def tumblr(self):
+        pass
+    tumblr.exposed = True
 
     def twitter(self):
         #can't do this one yet
